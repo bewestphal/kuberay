@@ -3,6 +3,8 @@ package ray
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -543,7 +545,13 @@ func (r *RayServiceReconciler) checkIfNeedSubmitServeDeployment(rayServiceInstan
 		shouldUpdate = true
 		reason = fmt.Sprintf("Current Serve config doesn't match cached Serve config for cluster %s with key %s", rayClusterInstance.Name, cacheKey)
 	} else if len(serveStatus.ServeStatuses) == 0 {
-		shouldUpdate = true
+		// hack to give deployments more time to update
+		// see: https://github.com/ray-project/ray/issues/28652
+		if envUpdateMod := os.Getenv("RAY_SERVICE_UPDATE_MOD"); envUpdateMod != "" {
+			currentTime := time.Now().UTC().Unix()
+			updateMod, _ := strconv.ParseInt(envUpdateMod, 10, 64)
+			shouldUpdate = currentTime%updateMod == 0
+		}
 		reason = fmt.Sprintf("No Serve deployments have started deploying for cluster %s with key %s", rayClusterInstance.Name, cacheKey)
 	}
 
